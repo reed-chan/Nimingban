@@ -32,10 +32,13 @@ import android.support.v7.app.AlertDialog;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
+import android.text.Editable;
+import android.text.InputFilter;
 import android.text.Spannable;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.text.style.ClickableSpan;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.StyleSpan;
@@ -46,6 +49,7 @@ import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -65,7 +69,9 @@ import com.hippo.nimingban.client.data.Reply;
 import com.hippo.nimingban.client.data.Site;
 import com.hippo.nimingban.ui.GalleryActivity2;
 import com.hippo.nimingban.ui.PostActivity;
+import com.hippo.nimingban.util.MinMaxFilter;
 import com.hippo.nimingban.util.OpenUrlHelper;
+import com.hippo.nimingban.util.PostIgnoreUtils;
 import com.hippo.nimingban.util.ReadableTime;
 import com.hippo.nimingban.util.Settings;
 import com.hippo.nimingban.widget.ContentLayout;
@@ -143,6 +149,8 @@ public class PostFragment extends BaseFragment
     private List<WeakReference<ReplyHolder>> mHolderList = new LinkedList<>();
 
     private Callback mCallback;
+
+    private boolean isLoaded;
 
     public void setCallback(Callback callback) {
         mCallback = callback;
@@ -270,6 +278,8 @@ public class PostFragment extends BaseFragment
         Messenger.getInstance().register(Constants.MESSENGER_ID_REPLY, this);
         Messenger.getInstance().register(Constants.MESSENGER_ID_FAST_SCROLLER, this);
 
+        isLoaded = false;
+
         return view;
     }
 
@@ -360,6 +370,8 @@ public class PostFragment extends BaseFragment
 
     @Override
     public boolean onMenuItemClick(MenuItem item) {
+        if (!isLoaded) return true;
+
         switch (item.getItemId()) {
             case R.id.action_go_to:
                 int pages = mReplyHelper.getPages();
@@ -403,12 +415,13 @@ public class PostFragment extends BaseFragment
     }
 
     private class GoToDialogHelper implements View.OnClickListener,
-            DialogInterface.OnDismissListener {
+            DialogInterface.OnDismissListener, Slider.OnSetProgressListener, TextWatcher {
 
         private int mPages;
 
         private View mView;
         private Slider mSlider;
+        private EditText mEditText;
 
         private Dialog mDialog;
 
@@ -421,6 +434,12 @@ public class PostFragment extends BaseFragment
             mSlider = (Slider) mView.findViewById(R.id.slider);
             mSlider.setRange(1, pages);
             mSlider.setProgress(currentPage + 1);
+            mSlider.setOnSetProgressListener(this);
+            mEditText = (EditText) mView.findViewById(R.id.page_input);
+            mEditText.setText(Integer.toString(currentPage + 1)); // Android still treating int as resid
+            mEditText.setHint("1");
+            mEditText.setFilters(new InputFilter[] {new MinMaxFilter(1, pages)});
+            mEditText.addTextChangedListener(this);
         }
 
         public View getView() {
@@ -451,6 +470,30 @@ public class PostFragment extends BaseFragment
         public void onDismiss(DialogInterface dialog) {
             mDialog = null;
         }
+
+        @Override
+        public void onSetProgress(Slider slider, int newProgress, int oldProgress, boolean byUser, boolean confirm) {
+            if (!byUser) return;
+            mEditText.setText(String.valueOf(newProgress)); // To prevent Android treat progress as resid
+        }
+
+        @Override
+        public void onTextChanged(CharSequence s, int start, int before, int count) {
+            int i = s.length() > 0 ? Integer.parseInt(s.toString()) : 1;
+            mSlider.setProgress(i);
+        }
+
+        @Override
+        public void onFingerDown() {}
+
+        @Override
+        public void onFingerUp() {}
+
+        @Override
+        public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+        @Override
+        public void afterTextChanged(Editable s) {}
     }
 
 
@@ -614,6 +657,18 @@ public class PostFragment extends BaseFragment
                         startActivity(intent);
                     }
                 });
+            }
+
+            // TODO: Need getting rid of unwanted requests (example: post image thumbnail)
+            if (Settings.getEnableStrictIgnoreMode() && PostIgnoreUtils.INSTANCE.checkPostIgnored(postId)) {
+                mLeftText.setText("");
+                mCenterText.setText("No.9999999");
+                mRightText.setText(R.string.from_the_future);
+                mThumb.setVisibility(View.GONE);
+                mThumb.unload();
+                mContent.setText(R.string.ignore_post_message);
+                mButton.setVisibility(View.GONE);
+                mButton.setOnClickListener(null);
             }
 
             mRequest = null;
@@ -944,6 +999,12 @@ public class PostFragment extends BaseFragment
                 request.setCallback(new GetPostIdFromReferenceListener());
                 mNMBClient.execute(request);
             } else {
+                if (Settings.getEnableStrictIgnoreMode() && PostIgnoreUtils.INSTANCE.checkPostIgnored(mId)) {
+                    isLoaded = false;
+                    mReplyHelper.showText(getString(R.string.ignore_post_message));
+                    return;
+                }
+
                 NMBRequest request = new NMBRequest();
                 mNMBRequest = request;
                 request.setSite(mSite);
@@ -959,6 +1020,12 @@ public class PostFragment extends BaseFragment
 
         @Override
         public void onSuccess(ACReference result) {
+            if (Settings.getEnableStrictIgnoreMode() && PostIgnoreUtils.INSTANCE.checkPostIgnored(result.postId)) {
+                isLoaded = false;
+                mReplyHelper.showText(getString(R.string.ignore_post_message));
+                return;
+            }
+
             mReplyId = null;
             mId = result.postId;
             mToolbar.setTitle(mSite.getPostTitle(getContext(), mId));
@@ -1043,6 +1110,8 @@ public class PostFragment extends BaseFragment
                         mReplyHelper.setPages(Integer.MAX_VALUE); // Keep going
                     }
                 }
+
+                isLoaded = true;
             }
             // Clear
             mRequest = null;
@@ -1057,6 +1126,8 @@ public class PostFragment extends BaseFragment
                 mNMBRequest = null;
 
                 mReplyHelper.onGetExpection(mTaskId, e);
+
+                isLoaded = false;
             }
             // Clear
             mRequest = null;
@@ -1069,6 +1140,8 @@ public class PostFragment extends BaseFragment
 
                 // Clear
                 mNMBRequest = null;
+
+                isLoaded = false;
             }
             // Clear
             mRequest = null;

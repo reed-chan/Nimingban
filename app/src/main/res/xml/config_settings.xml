@@ -83,6 +83,15 @@
         android:defaultValue="0"
         android:widgetLayout="@layout/preference_widget_icon_list"/>
 
+    <com.hippo.preference.FixedSwitchPreference
+        style="?android:attr/preferenceStyle"
+        android:key="strict_ignore_post_mode"
+        android:title="@string/main_strict_ignore_post_mode"
+        app:summaryOn="@string/main_strict_ignore_post_mode_summary_on"
+        app:summaryOff="@string/main_strict_ignore_post_mode_summary_off"
+        android:defaultValue="false"
+        android:widgetLayout="@layout/preference_widget_fixed_switch"/>
+
     <Preference
         android:key="restore_ignored_posts"
         android:title="@string/main_restore_ignored_post"
@@ -90,11 +99,16 @@
 
     <com.hippo.preference.FixedSwitchPreference
         style="?android:attr/preferenceStyle"
-        android:key="https_enabled"
-        android:title="@string/main_enable_https"
-        android:summary="@string/main_enable_https_summary"
-        android:defaultValue="true"
+        android:key="enable_customized_ac_host"
+        android:title="@string/main_enable_customized_ac_host"
+        android:defaultValue="false"
         android:widgetLayout="@layout/preference_widget_fixed_switch" />
+
+    <com.hippo.nimingban.preference.HostPreference
+        style="?android:attr/preferenceStyle"
+        android:key="customized_ac_host"
+        android:title="@string/main_customized_ac_host"
+        android:dependency="enable_customized_ac_host"/>
 
     <com.hippo.preference.FixedSwitchPreference
         style="?android:attr/preferenceStyle"

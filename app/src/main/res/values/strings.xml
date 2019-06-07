@@ -72,6 +72,7 @@
     <string name="lucky">Haha</string>
     <string name="go_to_post">Go to thread</string>
     <string name="keyword_empty">Keyword is empty</string>
+    <string name="invalid_post_id">Thread id is not valid</string>
     <string name="not_found">Nobody here but us chickens</string>
     <string name="search_title">Search - %s</string>
 
@@ -104,6 +105,9 @@
 
     <string name="ignore_post_confirm_title">Are you sure want to ignore this post?</string>
     <string name="ignore_post_confirm_message">After ignored, you can access it from enter post id only.</string>
+    <string name="ignore_post_confirm_message_strict">After ignored, you can\'t access these posts unless you restored all ignored posts.</string>
+
+    <string name="ignore_post_message">This post has been ignored</string>
 
     <string name="comment_copied_clipboard">Copied to clipboard</string>
 
@@ -283,11 +287,16 @@
     <string name="main_fix_image_urls">Fix image URLs</string>
     <string name="main_fix_image_urls_summary_on">Use default image URLs</string>
     <string name="main_fix_image_urls_summary_off">Get image URLs from the API. Enable it if loading images failed</string>
+    <string name="main_strict_ignore_post_mode">Strict ignore post mode</string>
+    <string name="main_strict_ignore_post_mode_summary_on">You can\'t access ignored posts anymore</string>
+    <string name="main_strict_ignore_post_mode_summary_off">You still can access ignored posts using go to post id</string>
     <string name="main_restore_ignored_post">Restore all ignored posts</string>
     <string name="main_restore_ignored_post_summary">The posts you ignored will redisplayed</string>
     <string name="main_restore_ignored_post_successfully">Restoring successful</string>
-    <string name="main_enable_https">Enable HTTPS connection</string>
-    <string name="main_enable_https_summary">Try to disable this if some connection errors occurred</string>
+    <string name="main_enable_customized_ac_host">Enable customized host</string>
+    <string name="main_customized_ac_host">Customized host</string>
+    <string name="main_customized_ac_host_hint">Host</string>
+    <string name="main_customized_ac_host_invalid">Invalid host</string>
     <string name="main_analysis">Enable data analysis</string>
     <string name="main_about_analysis">About data analysis</string>
     <string name="main_author">Author</string>
@@ -390,5 +399,9 @@
     <string name="image_search_saucenao">SauceNAO</string>
     <string name="image_search_iqdb">Iqdb</string>
     <string name="image_search_iqdb_3d">Iqdb 3D</string>
+    <string name="main_forum_auto_sorting">Forum Auto Sorting</string>
+    <string name="main_forum_auto_sorting_summary_on">Sort forums by frequency</string>
+    <string name="main_forum_auto_sorting_summary_off">Fixed forum order</string>
+    <string name="click_star_icon_pin">Click the star to pin a favorite forum on the top</string>
 
 </resources>

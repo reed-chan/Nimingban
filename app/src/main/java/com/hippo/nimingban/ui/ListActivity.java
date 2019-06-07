@@ -81,6 +81,7 @@ import com.hippo.nimingban.client.data.UpdateStatus;
 import com.hippo.nimingban.dao.ACForumRaw;
 import com.hippo.nimingban.util.Crash;
 import com.hippo.nimingban.util.DB;
+import com.hippo.nimingban.util.ForumAutoSortingUtils;
 import com.hippo.nimingban.util.LinkMovementMethod2;
 import com.hippo.nimingban.util.PostIgnoreUtils;
 import com.hippo.nimingban.util.ReadableTime;
@@ -143,6 +144,7 @@ public final class ListActivity extends AbsActivity
     private ActionBarDrawerToggle mDrawerToggle;
 
     private MenuItem mRule;
+    private MenuItem mNotice;
     private MenuItem mCreatePost;
     private MenuItem mSortForumsMenu;
 
@@ -230,6 +232,7 @@ public final class ListActivity extends AbsActivity
                 }
                 if (mRightDrawer == view) {
                     setMenuItemVisible(mRule, true);
+                    setMenuItemVisible(mNotice, true);
                     setMenuItemVisible(mCreatePost, true);
                     setMenuItemVisible(mSortForumsMenu, false);
                 }
@@ -242,6 +245,7 @@ public final class ListActivity extends AbsActivity
                 }
                 if (mRightDrawer == view) {
                     setMenuItemVisible(mRule, false);
+                    setMenuItemVisible(mNotice, false);
                     setMenuItemVisible(mCreatePost, false);
                     setMenuItemVisible(mSortForumsMenu, true);
                 }
@@ -421,7 +425,7 @@ public final class ListActivity extends AbsActivity
                 switch (i) {
                     case 0:
                         Intent intent = new Intent(ListActivity.this, TypeSendActivity.class);
-                        intent.setAction(TypeSendActivity.ACTION_CREATE_POST);
+                        intent.setAction(TypeSendActivity.ACTION_REPORT);
                         intent.putExtra(TypeSendActivity.KEY_SITE, mCurrentForum.getNMBSite().getId());
                         intent.putExtra(TypeSendActivity.KEY_ID, mCurrentForum.getNMBSite().getReportForumId());
                         intent.putExtra(TypeSendActivity.KEY_TEXT, ">>No." + post.getNMBPostId() + "\n");
@@ -430,7 +434,7 @@ public final class ListActivity extends AbsActivity
                     case 1:
                         new AlertDialog.Builder(ListActivity.this)
                                 .setTitle(R.string.ignore_post_confirm_title)
-                                .setMessage(R.string.ignore_post_confirm_message)
+                                .setMessage(Settings.getEnableStrictIgnoreMode() ? R.string.ignore_post_confirm_message_strict : R.string.ignore_post_confirm_message)
                                 .setPositiveButton(android.R.string.ok, new DialogInterface.OnClickListener() {
                                     @Override
                                     public void onClick(DialogInterface dialogInterface, int i) {
@@ -638,7 +642,11 @@ public final class ListActivity extends AbsActivity
         mNMBClient.execute(request);
 
         // Get Notice
-        request = new NMBRequest();
+        getNotice(false);
+    }
+
+    private void getNotice(final boolean forceDisplay) {
+        NMBRequest request = new NMBRequest();
         mNoticeRequest = request;
         request.setSite(ACSite.getInstance());
         request.setMethod(NMBClient.METHOD_NOTICE);
@@ -655,17 +663,17 @@ public final class ListActivity extends AbsActivity
                 }
                 long oldDate = Settings.getNoticeDate();
                 final long newDate = result.date;
-                if (newDate <= oldDate) {
+                if (newDate <= oldDate && !forceDisplay) {
                     return;
                 }
 
                 final CheckBoxDialogBuilder builder = new CheckBoxDialogBuilder(
-                        ListActivity.this, Html.fromHtml(result.content), getString(R.string.get_it), false);
+                        ListActivity.this, Html.fromHtml(result.content), getString(R.string.get_it), !forceDisplay, false);
                 Dialog dialog = builder.setTitle(R.string.notice).setOnDismissListener(
                         new DialogInterface.OnDismissListener() {
                             @Override
                             public void onDismiss(DialogInterface dialog) {
-                                if (builder.isChecked()) {
+                                if (builder.isShowCheckbox() && builder.isChecked()) {
                                     Settings.putNoticeDate(newDate);
                                 }
                             }
@@ -693,11 +701,13 @@ public final class ListActivity extends AbsActivity
         mCurrentForum = forum;
         mRightDrawer.setActivatedForum(forum);
         updateTitleByForum(mCurrentForum);
+        ForumAutoSortingUtils.addACForumFrequency(forum);
     }
 
     private void updateForums(boolean firstTime) {
         Forum currentForum = mCurrentForum;
-        List<DisplayForum> forums = DB.getACForums(true); // TODO DB.getForums
+        boolean sorting = Settings.getForumAutoSorting();
+        List<DisplayForum> forums = DB.getACForums(true, sorting); // TODO DB.getForums
         mRightDrawer.setForums(forums);
 
         // Try to find the same forum
@@ -796,15 +806,18 @@ public final class ListActivity extends AbsActivity
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.activity_list, menu);
         mRule = menu.findItem(R.id.action_rule);
+        mNotice = menu.findItem(R.id.action_notice);
         mCreatePost = menu.findItem(R.id.action_create_post);
         mSortForumsMenu = menu.findItem(R.id.action_sort_forums);
 
         if (mDrawerLayout.isDrawerOpen(Gravity.RIGHT)) {
             mRule.setVisible(false);
+            mNotice.setVisible(false);
             mCreatePost.setVisible(false);
             mSortForumsMenu.setVisible(true);
         } else {
             mRule.setVisible(true);
+            mNotice.setVisible(true);
             mCreatePost.setVisible(true);
             mSortForumsMenu.setVisible(false);
         }
@@ -874,6 +887,10 @@ public final class ListActivity extends AbsActivity
                     tv.setMovementMethod(new LinkMovementMethod2(ListActivity.this));
                     new AlertDialog.Builder(this).setTitle(R.string.rule).setView(view).show();
                 }
+                return true;
+            case R.id.action_notice:
+                if (mCurrentForum != null)
+                    getNotice(true);
                 return true;
             case R.id.action_create_post:
                 if (mCurrentForum != null) {
@@ -988,7 +1005,7 @@ public final class ListActivity extends AbsActivity
                 Intent intent = new Intent(ListActivity.this, PostActivity.class);
                 intent.setAction(PostActivity.ACTION_SITE_REPLY_ID);
                 intent.putExtra(PostActivity.KEY_SITE, ACSite.getInstance().getId());
-                intent.putExtra(PostActivity.KEY_ID, Integer.toString(MathUtils.random(1, 6666667))); // TODO how to get the max id
+                intent.putExtra(PostActivity.KEY_ID, Integer.toString(MathUtils.random(1, 16000000))); // TODO how to get the max id
                 startActivity(intent);
                 mDialog.dismiss();
                 return;
@@ -1007,6 +1024,11 @@ public final class ListActivity extends AbsActivity
                 startActivity(intent);
                 mDialog.dismiss();
             } else if (mNeutral == v) {
+                if (!TextUtils.isDigitsOnly(keyword)) {
+                    Toast.makeText(ListActivity.this, R.string.invalid_post_id, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
                 Intent intent = new Intent(ListActivity.this, PostActivity.class);
                 intent.setAction(PostActivity.ACTION_SITE_REPLY_ID);
                 intent.putExtra(PostActivity.KEY_SITE, ACSite.getInstance().getId());
