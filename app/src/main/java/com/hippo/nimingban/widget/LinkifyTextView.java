@@ -20,13 +20,22 @@ import android.content.Context;
 import android.support.annotation.NonNull;
 import android.text.Layout;
 import android.text.Spanned;
-import android.text.style.ClickableSpan;
+import android.text.style.URLSpan;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
+import com.hippo.nimingban.client.ReferenceSpan;
+import com.hippo.nimingban.client.ac.data.ACItemUtils;
+import com.hippo.yorozuya.Utilities;
 
 public class LinkifyTextView extends FontTextView {
 
-    private ClickableSpan mCurrentSpan;
+    private static final Class<?>[] SUPPORTED_SPAN_TYPE = {
+        URLSpan.class,
+        ReferenceSpan.class,
+        ACItemUtils.HideSpan.class,
+    };
+
+    private Object mCurrentSpan;
 
     public LinkifyTextView(Context context) {
         super(context);
@@ -40,7 +49,7 @@ public class LinkifyTextView extends FontTextView {
         super(context, attrs, defStyleAttr);
     }
 
-    public ClickableSpan getCurrentSpan() {
+    public Object getCurrentSpan() {
         return mCurrentSpan;
     }
 
@@ -74,10 +83,13 @@ public class LinkifyTextView extends FontTextView {
                 int line = layout.getLineForVertical(y);
                 int off = layout.getOffsetForHorizontal(line, x);
 
-                ClickableSpan[] spans = ((Spanned)getText()).getSpans(off, off, ClickableSpan.class);
+                Object[] spans = ((Spanned)getText()).getSpans(off, off, Object.class);
 
-                if (spans.length > 0) {
-                    mCurrentSpan = spans[0];
+                for (Object span : spans) {
+                    if (Utilities.contain(SUPPORTED_SPAN_TYPE, span.getClass())) {
+                        mCurrentSpan = span;
+                        break;
+                    }
                 }
             }
         }

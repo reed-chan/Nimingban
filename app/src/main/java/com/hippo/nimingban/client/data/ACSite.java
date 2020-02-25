@@ -18,21 +18,20 @@ package com.hippo.nimingban.client.data;
 
 import android.content.Context;
 import android.support.annotation.NonNull;
-
 import com.hippo.nimingban.NMBApplication;
 import com.hippo.nimingban.client.ac.ACUrl;
 import com.hippo.nimingban.client.ac.data.ACCdnPath;
 import com.hippo.nimingban.network.HttpCookieWithId;
 import com.hippo.nimingban.network.SimpleCookieStore;
 import com.hippo.nimingban.util.Settings;
+import com.hippo.util.UrlUtils;
 import com.hippo.yorozuya.MathUtils;
-
 import java.net.HttpCookie;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-
 import okhttp3.HttpUrl;
 
 public class ACSite extends Site {
@@ -41,13 +40,16 @@ public class ACSite extends Site {
 
     private static final String DEFAULT_PICTURE_PREFIX = ACUrl.getHost() + "/Public/Upload/";
 
+    private static final List<ACCdnPath> DEFAULT_AC_CDN_PATH_LIST = Collections.singletonList(new ACCdnPath());
+    private static final String[] DEFAULT_AC_CDN_HOST_LIST = { ACCdnPath.DEFAULT_CDN_HOST };
+
     private URL mSiteUrl;
 
-    private List<ACCdnPath> mCdnPathList;
+    private List<ACCdnPath> mCdnPathList = DEFAULT_AC_CDN_PATH_LIST;
     private float mRateSum;
 
     private boolean mCdnHostsDirty;
-    private String[] mCdnHosts;
+    private String[] mCdnHosts = DEFAULT_AC_CDN_HOST_LIST;
 
     private static ACSite sInstance;
 
@@ -122,19 +124,26 @@ public class ACSite extends Site {
     }
 
     public synchronized void setCdnPath(List<ACCdnPath> list) {
-        mCdnPathList = list;
-        if (list == null) {
+        if (list == null || list.isEmpty()) {
             return;
         }
+
+        // Remove invalid cdn path
+        List<ACCdnPath> paths = new ArrayList<>(list.size());
+        for (ACCdnPath path : list) {
+            if (path.url != null && HttpUrl.parse(path.url) != null && path.rate > 0) {
+                paths.add(path);
+            }
+        }
+        if (paths.isEmpty()) {
+            return;
+        }
+
+        mCdnPathList = paths;
 
         mRateSum = 0.0f;
         for (int i = 0, size = list.size(); i < size; i++) {
             mRateSum += list.get(i).rate;
-        }
-
-        if (mRateSum <= 0.0f) {
-            // Bad !
-            mCdnPathList = null;
         }
 
         // Set cdn hosts dirty
@@ -164,6 +173,9 @@ public class ACSite extends Site {
             } else {
                 List<String> hosts = new ArrayList<>();
                 for (ACCdnPath cdn : mCdnPathList) {
+                    if (cdn.url == null) {
+                        continue;
+                    }
                     HttpUrl url = HttpUrl.parse(cdn.url);
                     if (url != null) {
                         hosts.add(url.host());
@@ -180,7 +192,7 @@ public class ACSite extends Site {
         ACCdnPath cdnPath;
 
         if (mCdnPathList != null && (cdnPath = getCdnPath()) != null) {
-            url = cdnPath.url + key;
+            url = UrlUtils.join(cdnPath.url, key);
         } else {
             url = DEFAULT_PICTURE_PREFIX + key;
         }
